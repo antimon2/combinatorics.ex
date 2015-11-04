@@ -33,32 +33,26 @@ defmodule Combinatorics do
   def product([]), do: []
   def product([it|[]]), do: Stream.map(it, &{&1})
   def product(its) when is_list(its) do
-    funs = its |> Enum.map(fn it -> 
-      # case Enumerable.reduce(it, {:suspend, nil}, &reducer/2) do
-      #   {:suspended, _, fun} -> fun
-      # end 
-      Enumerable.reduce(it, {:suspend, nil}, &reducer/2) |> elem(2)
-    end)
-    &do_product({funs, [], funs, [], []}, &1, &2)
+    &do_product({its, [], its, [], []}, &1, &2)
   end
 
   defp do_product(_, {:halt, term}, _fun), do: {:halted, term}
   defp do_product(v, {:suspend, term}, fun) do
     {:suspended, term, &do_product(v, &1, fun)}
   end
-  defp do_product({[], [f|fs], [], [e|es], vals = [_|vs]}, {:cont, term}, fun) do
-    do_product({[f], fs, [e], es, vs}, fun.(List.to_tuple(:lists.reverse(vals)), term), fun)
+  defp do_product({[], [x|ys], [], [z|ws], vals = [_|vs]}, {:cont, term}, fun) do
+    do_product({[x], ys, [z], ws, vs}, fun.(List.to_tuple(:lists.reverse(vals)), term), fun)
   end
-  defp do_product({[x|xs], [], [e|es], [], []}, acc = {:cont, term}, fun) do
-    case e.({:cont, nil}) do
-      {:suspended, v, next_e} -> do_product({xs, [x], es, [next_e], [v]}, acc, fun)
+  defp do_product({[y|xs], [], [z|zs], [], []}, acc = {:cont, term}, fun) do
+    case next(z) do
+      {:next, v, w} -> do_product({xs, [y], zs, [w], [v]}, acc, fun)
       _ -> {:done, term}
     end
   end
-  defp do_product({xss = [x|xs], yss = [y|ys], [e|es], zss = [z|zs], vals = [_|vs]}, acc = {:cont, _}, fun) do
-    case e.({:cont, nil}) do
-      {:suspended, v, next_e} -> do_product({xs, [x|yss], es, [next_e|zss], [v|vals]}, acc, fun)
-      _ -> do_product({[y|xss], ys, [z|[x|es]], zs, vs}, acc, fun)
+  defp do_product({xss = [x|xs], yss = [y|ys], [z|zs], wss = [w|ws], vals = [_|vs]}, acc = {:cont, _}, fun) do
+    case next(z) do
+      {:next, v, next_w} -> do_product({xs, [x|yss], zs, [next_w|wss], [v|vals]}, acc, fun)
+      _ -> do_product({[y|xss], ys, [w|[x|zs]], ws, vs}, acc, fun)
     end
   end
 
@@ -78,10 +72,9 @@ defmodule Combinatorics do
   def combinations(_enum, 0), do: []
   def combinations(enum, 1), do: Stream.map(enum, &{&1})
   def combinations(enum, n) when is_integer(n) and n > 1 do
-    case Enumerable.reduce(enum, {:cont, nil}, &reducer/2) do
-      {:halted, _} -> []
-      {:done, _} -> []
-      {:suspended, v, fun} -> &do_combinations({[fun], [v], :next, n - 1}, &1, &2)
+    case next(enum) do
+      {:next, v, fun} -> &do_combinations({[fun], [v], :next, n - 1}, &1, &2)
+      _  -> []
     end
   end
 
@@ -94,18 +87,39 @@ defmodule Combinatorics do
     do_combinations({fs, vals, :back, 1}, fun.(List.to_tuple(:lists.reverse(vals)), term), fun)
   end
   defp do_combinations({funs = [f|fs], vals = [_|vs], :next, n}, acc = {:cont, _}, fun) do
-    case f.({:cont, nil}) do
-      {:suspended, v, next_f} -> do_combinations({[next_f|funs], [v|vals], :next, n - 1}, acc, fun)
+    case next(f) do
+      {:next, v, next_f} -> do_combinations({[next_f|funs], [v|vals], :next, n - 1}, acc, fun)
       _ -> do_combinations({fs, vs, :back, n + 2}, acc, fun)
     end
   end
   defp do_combinations({[f|fs], [_|vs], :back, n}, acc = {:cont, _}, fun) do
-    case f.({:cont, nil}) do
-      {:suspended, v, next_f} -> do_combinations({[next_f|fs], [v|vs], :next, n - 1}, acc, fun)
+    case next(f) do
+      {:next, v, next_f} -> do_combinations({[next_f|fs], [v|vs], :next, n - 1}, acc, fun)
       _ -> do_combinations({fs, vs, :back, n + 1}, acc, fun)
     end
   end
 
   # === Common Private Functions ===
   defp reducer(v, _), do: {:suspend, v}
+
+  defp next([]), do: :done
+  defp next([x|xs]), do: {:next, x, xs}
+  defp next(fun) when is_function(fun, 1) do
+    case fun.({:cont, nil}) do
+      {:suspended, v, next_fun} -> {:next, v, next_fun}
+      _ -> :done
+    end
+  end
+  defp next({a, b}) do
+    case next(a) do
+      {:next, v, as} -> {:next, v, {as, b}}
+      _ -> next(b)
+    end
+  end
+  defp next(it) do
+    case Enumerable.reduce(it, {:cont, nil}, &reducer/2) do
+      {:suspended, v, next_fun} -> {:next, v, next_fun}
+      _ -> :done
+    end
+  end
 end
