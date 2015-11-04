@@ -99,6 +99,68 @@ defmodule Combinatorics do
     end
   end
 
+  # === permutations ===
+
+  @doc ~S"""
+  Permutations - full-length tuples, all possible orderings, no repeated elements.
+  Notice: parameter `enum` can be a List or a Range.
+
+  ## Examples
+  
+    iex> Combinatorics.permutations([1, 2, 3]) |> Enum.to_list
+    [{1, 2, 3}, {1, 3, 2}, {2, 1, 3}, {2, 3, 1}, {3, 1, 2}, {3, 2, 1}]
+  
+    iex> Combinatorics.permutations(2..4) |> Enum.to_list
+    [{2, 3, 4}, {2, 4, 3}, {3, 2, 4}, {3, 4, 2}, {4, 2, 3}, {4, 3, 2}]
+  """
+  def permutations(enum) when is_list(enum) do
+    permutations(enum, length(enum))
+  end
+  def permutations(enum = %Range{}) do
+    permutations(enum, Enum.count(enum))
+  end
+
+  @doc ~S"""
+  Permutations - n-length tuples, all possible orderings, no repeated elements.
+
+  ## Examples
+  
+    iex> Combinatorics.permutations(1..4, 2) |> Enum.to_list
+    [{1, 2}, {1, 3}, {1, 4}, {2, 1}, {2, 3}, {2, 4}, {3, 1}, {3, 2}, {3, 4}, {4, 1}, {4, 2}, {4, 3}]
+  
+    iex> Combinatorics.permutations(1..3, 3) |> Enum.to_list
+    [{1, 2, 3}, {1, 3, 2}, {2, 1, 3}, {2, 3, 1}, {3, 1, 2}, {3, 2, 1}]
+  """
+  def permutations(_enum, 0), do: []
+  def permutations(enum, 1), do: Stream.map(enum, &{&1})
+  def permutations(enum, n) when is_integer(n) and n > 1 do
+    case next(enum) do
+      {:next, v, rest} -> &do_permutations({[{v, [], rest}], [v], :next, n - 1}, &1, &2)
+      _  -> []
+    end
+  end
+
+  defp do_permutations(_, {:halt, term}, _fun), do: {:halted, term}
+  defp do_permutations(v, {:suspend, term}, fun) do
+    {:suspended, term, &do_permutations(v, &1, fun)}
+  end
+  defp do_permutations({[], _, _, _}, {:cont, term}, _), do: {:done, term}
+  defp do_permutations({fs, vals, _, 0}, {:cont, term}, fun) do
+    do_permutations({fs, vals, :back, 1}, fun.(List.to_tuple(:lists.reverse(vals)), term), fun)
+  end
+  defp do_permutations({(fs=[{_, r, s}|_]), vals, :next, n}, acc = {:cont, term}, fun) do
+    case next({r, s}) do
+      {:next, v, rest} -> do_permutations({[{v, [], rest}|fs], [v|vals], :next, n - 1}, acc, fun)
+      _ -> {:done, term}
+    end
+  end
+  defp do_permutations({[{o, r, s}|fs], [_|vs], :back, n}, acc = {:cont, _}, fun) do
+    case next(s) do
+      {:next, v, rest} -> do_permutations({[{v, {r, [o]}, rest}|fs], [v|vs], :next, n - 1}, acc, fun)
+      _ -> do_permutations({fs, vs, :back, n + 1}, acc, fun)
+    end
+  end
+
   # === Common Private Functions ===
   defp reducer(v, _), do: {:suspend, v}
 
