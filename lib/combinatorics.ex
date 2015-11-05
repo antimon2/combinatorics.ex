@@ -149,14 +149,14 @@ defmodule Combinatorics do
     do_permutations({fs, vals, :back, 1}, fun.(List.to_tuple(:lists.reverse(vals)), term), fun)
   end
   defp do_permutations({(fs=[{_, r, s}|_]), vals, :next, n}, acc = {:cont, term}, fun) do
-    case next({r, s}) do
+    case next({:lists.reverse(r), s}) do
       {:next, v, rest} -> do_permutations({[{v, [], rest}|fs], [v|vals], :next, n - 1}, acc, fun)
       _ -> {:done, term}
     end
   end
   defp do_permutations({[{o, r, s}|fs], [_|vs], :back, n}, acc = {:cont, _}, fun) do
     case next(s) do
-      {:next, v, rest} -> do_permutations({[{v, {r, [o]}, rest}|fs], [v|vs], :next, n - 1}, acc, fun)
+      {:next, v, rest} -> do_permutations({[{v, [o|r], rest}|fs], [v|vs], :next, n - 1}, acc, fun)
       _ -> do_permutations({fs, vs, :back, n + 1}, acc, fun)
     end
   end
