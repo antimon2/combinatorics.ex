@@ -33,27 +33,12 @@ defmodule Combinatorics do
   def product([]), do: []
   def product([it|[]]), do: Stream.map(it, &{&1})
   def product(its) when is_list(its) do
-    &do_product({its, [], its, [], []}, &1, &2)
+    do_product(its, [[]]) |> Stream.map(&List.to_tuple(:lists.reverse(&1)))
   end
 
-  defp do_product(_, {:halt, term}, _fun), do: {:halted, term}
-  defp do_product(v, {:suspend, term}, fun) do
-    {:suspended, term, &do_product(v, &1, fun)}
-  end
-  defp do_product({[], [x|ys], [], [z|ws], vals = [_|vs]}, {:cont, term}, fun) do
-    do_product({[x], ys, [z], ws, vs}, fun.(List.to_tuple(:lists.reverse(vals)), term), fun)
-  end
-  defp do_product({[y|xs], [], [z|zs], [], []}, acc = {:cont, term}, fun) do
-    case next(z) do
-      {:next, v, w} -> do_product({xs, [y], zs, [w], [v]}, acc, fun)
-      _ -> {:done, term}
-    end
-  end
-  defp do_product({xss = [x|xs], yss = [y|ys], [z|zs], wss = [w|ws], vals = [_|vs]}, acc = {:cont, _}, fun) do
-    case next(z) do
-      {:next, v, next_w} -> do_product({xs, [x|yss], zs, [next_w|wss], [v|vals]}, acc, fun)
-      _ -> do_product({[y|xss], ys, [w|[x|zs]], ws, vs}, acc, fun)
-    end
+  defp do_product([], vals), do: vals
+  defp do_product([x|xs], vals) do
+    do_product(xs, Stream.flat_map(vals, fn vs -> Stream.map(x, &[&1|vs]) end))
   end
 
   # === combinations ===
