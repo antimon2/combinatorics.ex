@@ -1,10 +1,11 @@
 defmodule Combinatorics.Inf do
+  import Combinatorics.Util, only: [_next: 1]
 
   # === product ===
 
   @doc ~S"""
   Cartesian Product of 2 Enumerables.
-  (Both Enumerables should be infinite)
+  (Both Enumerables can be infinite)
 
   ## Examples
   
@@ -100,8 +101,8 @@ defmodule Combinatorics.Inf do
   defp combinations_process({_, {_, 0}}), do: nil
   defp combinations_process({vals, {it, n}}) do
     m = n - 1
-    Stream.unfold(next(it), fn
-      {:next, v, next_it} -> {{[v|vals], {next_it, m}}, next(next_it)}
+    Stream.unfold(_next(it), fn
+      {:next, v, next_it} -> {{[v|vals], {next_it, m}}, _next(next_it)}
       _ -> nil
     end)
   end
@@ -110,7 +111,7 @@ defmodule Combinatorics.Inf do
 
   @doc ~S"""
   Permutations - n-length tuples, all possible orderings, no repeated elements.
-  The Enumerable can be infinite. (n cannot be omitted)
+  The Enumerable can be infinite. (`n` cannot be omitted)
 
   ## Examples
   
@@ -144,9 +145,9 @@ defmodule Combinatorics.Inf do
   defp permutations_process({_, {_, 0}}), do: nil
   defp permutations_process({vals, {it, n}}) do
     m = n - 1
-    Stream.unfold({[], next(it)}, fn
-      {[], {:next, v, next_it}} -> {{[v|vals], {next_it, m}}, {[v], next(next_it)}}
-      {es, {:next, v, next_it}} -> {{[v|vals], {{:lists.reverse(es), next_it}, m}}, {[v|es], next(next_it)}}
+    Stream.unfold({[], _next(it)}, fn
+      {[], {:next, v, next_it}} -> {{[v|vals], {next_it, m}}, {[v], _next(next_it)}}
+      {es, {:next, v, next_it}} -> {{[v|vals], {{:lists.reverse(es), next_it}, m}}, {[v|es], _next(next_it)}}
       _ -> nil
     end)
   end
@@ -154,36 +155,13 @@ defmodule Combinatorics.Inf do
   # === Common Private Functions ===
   defp _loop([], _), do: nil
   defp _loop([it | qs], process) do
-    case next(it) do
+    case _next(it) do
       {:next, v = {vals, _}, rs} -> 
         case process.(v) do
           nil -> {List.to_tuple(:lists.reverse(vals)), qs ++ [rs]}
           ps -> _loop(qs ++ [ps, rs], process)
         end
       _ -> _loop(qs, process)
-    end
-  end
-
-  defp reducer(v, _), do: {:suspend, v}
-
-  defp next([]), do: :done
-  defp next([x|xs]), do: {:next, x, xs}
-  defp next(fun) when is_function(fun, 1) do
-    case fun.({:cont, nil}) do
-      {:suspended, v, next_fun} -> {:next, v, next_fun}
-      _ -> :done
-    end
-  end
-  defp next({a, b}) do
-    case next(a) do
-      {:next, v, as} -> {:next, v, {as, b}}
-      _ -> next(b)
-    end
-  end
-  defp next(it) do
-    case Enumerable.reduce(it, {:cont, nil}, &reducer/2) do
-      {:suspended, v, next_fun} -> {:next, v, next_fun}
-      _ -> :done
     end
   end
 end
